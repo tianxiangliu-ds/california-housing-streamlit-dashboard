@@ -2,53 +2,91 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 修改后的路径，使用其中一种方法
-df = pd.read_csv('housing.csv')
 
-st.title('California Housing Data (1990) by Joy Liu')
+st.set_page_config(
+    page_title="California Housing Dashboard",
+    page_icon="🏠",
+    layout="wide"
+)
 
-# 添加价格滑动条
-price_slider = st.slider('Minimal Median House Value:', 200000, 500001, 200000)
 
-# 添加侧边栏中的多选过滤器
+@st.cache_data
+def load_data():
+    df = pd.read_csv("housing.csv")
+    return df
+
+
+df = load_data()
+
+st.title("🏠 California Housing Streamlit Dashboard")
+st.markdown(
+    "This dashboard explores the California Housing dataset with interactive filters, "
+    "geographic visualization, and housing value distribution analysis."
+)
+
+st.sidebar.header("Filters")
+
+price_min = int(df["median_house_value"].min())
+price_max = int(df["median_house_value"].max())
+
+price_range = st.sidebar.slider(
+    "Median House Value Range",
+    min_value=price_min,
+    max_value=price_max,
+    value=(price_min, price_max)
+)
+
 location_type = st.sidebar.multiselect(
-    'Choose the location type',
-    df['ocean_proximity'].unique(),  # 位置选项
-    df['ocean_proximity'].unique()  # 默认选项
+    "Ocean Proximity",
+    options=sorted(df["ocean_proximity"].unique()),
+    default=sorted(df["ocean_proximity"].unique())
 )
 
-# 添加侧边栏中的单选按钮过滤器
 income_level = st.sidebar.radio(
-    "Choose income level",
-    ('Low', 'Medium', 'High')
+    "Income Level",
+    ["All", "Low", "Medium", "High"]
 )
 
-# 根据收入等级过滤数据
-if income_level == 'Low':
-    df = df[df['median_income'] <= 2.5]
-elif income_level == 'Medium':
-    df = df[(df['median_income'] > 2.5) & (df['median_income'] < 4.5)]
+filtered_df = df[
+    (df["median_house_value"] >= price_range[0]) &
+    (df["median_house_value"] <= price_range[1]) &
+    (df["ocean_proximity"].isin(location_type))
+].copy()
+
+if income_level == "Low":
+    filtered_df = filtered_df[filtered_df["median_income"] <= 2.5]
+elif income_level == "Medium":
+    filtered_df = filtered_df[
+        (filtered_df["median_income"] > 2.5) &
+        (filtered_df["median_income"] < 4.5)
+    ]
+elif income_level == "High":
+    filtered_df = filtered_df[filtered_df["median_income"] >= 4.5]
+
+st.subheader("Key Metrics")
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Number of Records", len(filtered_df))
+col2.metric("Average House Value", f"${filtered_df['median_house_value'].mean():,.0f}")
+col3.metric("Average Median Income", f"{filtered_df['median_income'].mean():.2f}")
+
+st.subheader("Geographic Distribution")
+
+if not filtered_df.empty:
+    st.map(filtered_df.rename(columns={"latitude": "lat", "longitude": "lon"}))
 else:
-    df = df[df['median_income'] >= 4.5]
+    st.warning("No data available for the selected filters.")
 
-# 根据位置类型过滤数据
-df = df[df['ocean_proximity'].isin(location_type)]
+st.subheader("Distribution of Median House Value")
 
-# 根据价格过滤数据
-df = df[df['median_house_value'] >= price_slider]
-
-# 在地图上显示数据
-st.map(df)
-
-# 显示房价直方图
-plt.style.use("seaborn-v0_8")
-st.subheader('Distribution of Median House Value')
-fig, ax = plt.subplots()
-df['median_house_value'].hist(bins=30, ax=ax)  # 使用30个bins显示直方图
-plt.xlabel('Median House Value')
-plt.ylabel('Frequency')
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.hist(filtered_df["median_house_value"], bins=30)
+ax.set_xlabel("Median House Value")
+ax.set_ylabel("Frequency")
+ax.set_title("Median House Value Distribution")
 st.pyplot(fig)
 
-# 显示数据表格
-st.subheader('Filtered Data')
-st.write(df)
+st.subheader("Filtered Data Preview")
+
+st.dataframe(filtered_df.head(100))
