@@ -14,6 +14,7 @@ This project allows users to explore housing price distributions, income levels,
 - Geographic map visualization
 - House value distribution histogram
 - Dynamic data table display
+- Linear regression model for house value prediction
 
 ---
 
